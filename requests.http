@@ -1,0 +1,116 @@
+### ============================================================
+### EventHive — Requests de la auditoría de seguridad
+### Extensión requerida en VS Code: REST Client
+### Antes de correr esto, el servidor debe estar activo
+### (pnpm start) en http://localhost:3000
+### ============================================================
+
+
+### ── CHECKPOINT 0 — El servidor responde ──────────────────────
+GET http://localhost:3000/
+
+
+### ============================================================
+### CHECKPOINT 1 — Inyección SQL en /auth/login
+### ============================================================
+
+### 1a) Login normal — debe funcionar
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "camila@correo.com",
+  "password": "concierto2026"
+}
+
+
+### 1b) Login con email inventado — debe fallar
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "no-existe@correo.com",
+  "password": "loquesea"
+}
+
+
+### 1c) 🚨 EL ATAQUE — inyección SQL clásica
+### Antes del fix: entra sin saber ninguna contraseña.
+### Después del fix: responde "Email o contraseña incorrectos".
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "' OR '1'='1' --",
+  "password": "cualquier-cosa"
+}
+
+
+### ============================================================
+### CHECKPOINT 2 — Validación de inputs en /boletos/comprar
+### ============================================================
+
+### 2a) Compra normal — debe funcionar
+POST http://localhost:3000/boletos/comprar
+Content-Type: application/json
+
+{
+  "eventoId": 1,
+  "cantidad": 2
+}
+
+
+### 2b) 🚨 EL ATAQUE — cantidad negativa
+### Antes del fix: "compra registrada" y el inventario SUBE.
+### Después del fix: error 400, cantidad inválida.
+POST http://localhost:3000/boletos/comprar
+Content-Type: application/json
+
+{
+  "eventoId": 1,
+  "cantidad": -999
+}
+
+
+### 2c) 🚨 Cantidad como texto
+### Antes del fix: pasa sin error y ensucia el cálculo.
+### Después del fix: error 400.
+POST http://localhost:3000/boletos/comprar
+Content-Type: application/json
+
+{
+  "eventoId": 1,
+  "cantidad": "hola"
+}
+
+
+### ============================================================
+### CHECKPOINT 3 — Variables de entorno
+### ============================================================
+### Este checkpoint no se prueba con una petición — se prueba
+### ABRIENDO src/config/pago.config.js en vivo y mostrando que
+### la clave está escrita ahí. La petición de abajo solo
+### confirma que, después del fix, la clave sigue funcionando
+### desde el .env (no se rompió nada al moverla).
+
+POST http://localhost:3000/boletos/procesar-pago-demo
+Content-Type: application/json
+
+{}
+
+
+### ============================================================
+### CHECKPOINT 4 — Exposición de datos sensibles en /compradores/:id
+### ============================================================
+
+### 4) 🚨 Antes del fix: la respuesta trae password y token_tarjeta.
+### Después del fix: solo id, nombre y email.
+GET http://localhost:3000/compradores/1
+
+
+### ============================================================
+### CHECKPOINT 5 — CORS
+### ============================================================
+### Este checkpoint NO se prueba desde REST Client — CORS es una
+### regla que aplica el NAVEGADOR, no herramientas como esta.
+### Usa frontend-test/index.html, ver GUIA-INSTRUCTOR.md.
